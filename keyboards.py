@@ -3,14 +3,17 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 def main_menu():
     return ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="🛒 Купить VPN"), KeyboardButton(text="📋 Мои подписки")],
-        [KeyboardButton(text="📖 Инструкция"), KeyboardButton(text="🆘 Поддержка")],
+        [KeyboardButton(text="🆓 Тест 3 дня"), KeyboardButton(text="🆘 Поддержка")],
     ], resize_keyboard=True)
 
 def tariffs_keyboard(tariffs):
     buttons = []
     for t in tariffs:
-        price = "Бесплатно" if t.price == 0 else f"{int(t.price)} руб."
+        if t.slug == "test":
+            continue
+        price = f"{int(t.price)} руб."
         buttons.append([InlineKeyboardButton(text=f"{t.name} — {price}", callback_data=f"buy_{t.slug}")])
+    buttons.append([InlineKeyboardButton(text="📖 Инструкция", callback_data="show_instructions")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def payment_keyboard(url: str, label: str):
