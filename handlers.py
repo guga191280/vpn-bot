@@ -17,9 +17,9 @@ INSTRUCTIONS = """
 📱 *Инструкция по подключению VPN*
 
 1. Скачай приложение:
-   • Android: *v2rayNG*
-   • iOS: *Streisand* или *Shadowrocket*
-   • Windows: *v2rayN*
+   • Android: *HAPP VPN*, *v2rayNG*
+   • iOS: *HAPP VPN*, *Streisand* или *Shadowrocket*
+   • Windows: *HAPP VPN*, *v2rayN*
    • macOS: *V2Box*
 
 2. Открой ссылку подписки из раздела «Мои подписки»
