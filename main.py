@@ -12,6 +12,9 @@ from scheduler import setup_scheduler
 
 logging.basicConfig(level=logging.INFO)
 
+async def health(request):
+    return web.Response(text="ok")
+
 async def on_startup(bot: Bot):
     await init_db()
     await bot.set_webhook(WEBHOOK_URL)
@@ -29,6 +32,8 @@ def main():
     dp.shutdown.register(on_shutdown)
 
     app = web.Application()
+    app.router.add_get("/", health)
+    app.router.add_get("/health", health)
     handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
     handler.register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
