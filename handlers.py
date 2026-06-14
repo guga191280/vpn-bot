@@ -25,7 +25,7 @@ INSTRUCTIONS = """
 2. Открой ссылку подписки из раздела «Мои подписки»
 3. Скопируй ссылку → вставь в приложение → подключись
 
-❓ Проблемы? Пиши в поддержку.
+❓ Проблемы? Пиши в поддержку: @digitalTech78
 """
 
 @router.message(CommandStart())
@@ -60,14 +60,23 @@ async def process_buy(call: CallbackQuery):
             return
 
         if tariff.price == 0:
+            existing = await db.execute(select(Subscription).where(
+                Subscription.user_id == call.from_user.id,
+                Subscription.plan == "test"
+            ))
+            if existing.scalar_one_or_none():
+                await call.message.answer("❌ Тестовая подписка уже была использована.")
+                await call.answer()
+                return
             await activate_subscription(call.from_user.id, tariff, db)
             await db.commit()
-            await call.message.answer("✅ Тестовая подписка активирована! Иди в «Мои подписки».")
+            await call.message.answer("✅ Тестовая подписка активирована!")
+            await call.message.answer(INSTRUCTIONS, parse_mode="Markdown")
+            await call.answer()
             return
 
         label = await create_payment_label(call.from_user.id, slug)
         url = get_payment_url(tariff.price, label, f"VPN {tariff.name}")
-
         db.add(Payment(
             user_id=call.from_user.id,
             amount=tariff.price,
@@ -88,42 +97,35 @@ async def process_buy(call: CallbackQuery):
 async def check_pay(call: CallbackQuery):
     label = call.data.split("_", 1)[1]
     await call.answer("Проверяю...")
-
     paid = await check_payment(label)
     if not paid:
         await call.message.answer("❌ Оплата не найдена. Попробуй через минуту.")
         return
-
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Payment).where(Payment.label == label))
         payment = result.scalar_one_or_none()
         if not payment or payment.status == "paid":
             await call.message.answer("⚠️ Платёж уже обработан.")
             return
-
         payment.status = "paid"
         payment.paid_at = datetime.utcnow()
-
         result2 = await db.execute(select(Tariff).where(Tariff.slug == payment.plan))
         tariff = result2.scalar_one_or_none()
-
         await activate_subscription(payment.user_id, tariff, db)
         await db.commit()
-
     await call.message.answer("✅ Оплата прошла! Подписка активирована.\n\nИди в «Мои подписки» чтобы получить ключ.")
+    await call.message.answer(INSTRUCTIONS, parse_mode="Markdown")
 
 async def activate_subscription(user_id: int, tariff, db):
     await xui.login()
     client = await xui.create_client(tariff.days, tariff.traffic_gb)
     vpn_key = await xui.get_client_url(client["client_id"])
-
     result = await db.execute(
         select(Subscription).where(Subscription.user_id == user_id, Subscription.is_active == True)
     )
     old_sub = result.scalar_one_or_none()
     if old_sub:
         old_sub.is_active = False
-
     sub = Subscription(
         user_id=user_id,
         xui_client_id=client["client_id"],
@@ -145,11 +147,9 @@ async def my_subscriptions(message: Message):
             )
         )
         sub = result.scalar_one_or_none()
-
     if not sub:
         await message.answer("У тебя нет активных подписок. Нажми «Купить VPN».")
         return
-
     status = "✅ Активна" if sub.expires_at > datetime.utcnow() else "❌ Истекла"
     text = (
         f"📋 *Твоя подписка*\n\n"
@@ -174,25 +174,3 @@ async def instructions(message: Message):
 @router.message(F.text == "🆘 Поддержка")
 async def support(message: Message):
     await message.answer("Напиши нам: @digitalTech78")
-
-@router.message(F.text == "🆓 Тест 3 дня")
-async def test_sub(message: Message):
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Subscription).where(
-            Subscription.user_id == message.from_user.id,
-            Subscription.plan == "test"
-        ))
-        existing = result.scalar_one_or_none()
-        if existing:
-            await message.answer("❌ Тестовая подписка уже была использована.")
-            return
-        result2 = await db.execute(select(Tariff).where(Tariff.slug == "test"))
-        tariff = result2.scalar_one_or_none()
-        await activate_subscription(message.from_user.id, tariff, db)
-        await db.commit()
-    await message.answer("✅ Тестовая подписка на 3 дня / 500 MB активирована!\n\nИди в «Мои подписки».")
-
-@router.callback_query(F.data == "show_instructions")
-async def show_instructions_cb(call: CallbackQuery):
-    await call.message.answer(INSTRUCTIONS, parse_mode="Markdown")
-    await call.answer()
