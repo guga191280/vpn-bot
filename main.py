@@ -23,8 +23,8 @@ async def on_shutdown(bot: Bot):
 def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
-    dp.include_router(router)
     dp.include_router(admin_router)
+    dp.include_router(router)
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
