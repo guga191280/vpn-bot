@@ -5,6 +5,7 @@ from config import XUI_URL
 
 XUI_INBOUND_ID = 4
 XUI_TOKEN = "Rz0rxMg2O02xSJjs5yLtuWeawLvzvPc8srB7QOT4ui5SYm6b"
+XUI_SUB_URL = "https://russ.official-happ.ru:2096/sub"
 
 class XUIClient:
     def __init__(self):
@@ -47,7 +48,6 @@ class XUIClient:
             )
             data = await resp.json()
             if data.get("success"):
-                # получаем subId
                 resp2 = await session.get(
                     f"{self.base_url}/panel/api/clients/get/{email}",
                     ssl=False
@@ -68,10 +68,10 @@ class XUIClient:
             )
             data = await resp.json()
             sub_id = data.get("obj", {}).get("client", {}).get("subId", client_id)
-            return f"{self.base_url}/sub/{sub_id}"
+            return f"{XUI_SUB_URL}/{sub_id}"
         except:
             pass
-        return f"{self.base_url}/sub/{client_id}"
+        return f"{XUI_SUB_URL}/{client_id}"
 
     async def disable_client(self, client_id: str):
         session = await self.get_session()
