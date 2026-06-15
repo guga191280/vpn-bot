@@ -47,7 +47,14 @@ class XUIClient:
             )
             data = await resp.json()
             if data.get("success"):
-                return {"client_id": email, "sub_id": email}
+                # получаем subId
+                resp2 = await session.get(
+                    f"{self.base_url}/panel/api/clients/get/{email}",
+                    ssl=False
+                )
+                data2 = await resp2.json()
+                sub_id = data2.get("obj", {}).get("client", {}).get("subId", email)
+                return {"client_id": email, "sub_id": sub_id}
         except Exception as e:
             pass
         return {"client_id": email, "sub_id": email}
@@ -56,12 +63,12 @@ class XUIClient:
         session = await self.get_session()
         try:
             resp = await session.get(
-                f"{self.base_url}/panel/api/clients/subLinks/{client_id}",
+                f"{self.base_url}/panel/api/clients/get/{client_id}",
                 ssl=False
             )
             data = await resp.json()
-            if data.get("success") and data.get("obj"):
-                return data["obj"]
+            sub_id = data.get("obj", {}).get("client", {}).get("subId", client_id)
+            return f"{self.base_url}/sub/{sub_id}"
         except:
             pass
         return f"{self.base_url}/sub/{client_id}"
