@@ -372,3 +372,109 @@ async def edit_tariff_price(message: Message, state: FSMContext):
             tariff.price = price
             await db.commit()
             await message.answer(f"✅ Цена тарифа *{tariff.name}* изменена на *{int(price)} руб.*", parse_mode="Markdown")
+
+from models import Server
+from server_manager import get_active_servers
+
+class ServerStates(StatesGroup):
+    waiting_server_name = State()
+    waiting_server_url = State()
+    waiting_server_token = State()
+    waiting_server_inbound = State()
+    waiting_server_sub_url = State()
+    waiting_delete_server_id = State()
+
+@admin_router.callback_query(F.data == "admin_servers")
+async def admin_servers(call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Server))
+        servers = result.scalars().all()
+    if not servers:
+        text = "Серверов нет."
+    else:
+        text = "🖥 *Серверы:*\n\n"
+        for s in servers:
+            status = "✅" if s.is_active else "❌"
+            text += f"{status} ID:{s.id} | *{s.name}* | inbound:{s.inbound_id}\n`{s.url}`\n\n"
+    buttons = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Добавить сервер", callback_data="admin_server_add")],
+        [InlineKeyboardButton(text="🗑 Удалить сервер", callback_data="admin_server_del")],
+    ])
+    await call.message.answer(text, reply_markup=buttons, parse_mode="Markdown")
+    await call.answer()
+
+@admin_router.callback_query(F.data == "admin_server_add")
+async def admin_server_add(call: CallbackQuery, state: FSMContext):
+    if not is_admin(call.from_user.id):
+        return
+    await state.set_state(ServerStates.waiting_server_name)
+    await call.message.answer("Введи название сервера (например: RU-1):")
+    await call.answer()
+
+@admin_router.message(ServerStates.waiting_server_name)
+async def server_name(message: Message, state: FSMContext):
+    await state.update_data(server_name=message.text.strip())
+    await state.set_state(ServerStates.waiting_server_url)
+    await message.answer("Введи URL панели (например: https://russ.official-happ.ru:12822/lpTK27EkL3HLJGkZgp):")
+
+@admin_router.message(ServerStates.waiting_server_url)
+async def server_url(message: Message, state: FSMContext):
+    await state.update_data(server_url=message.text.strip())
+    await state.set_state(ServerStates.waiting_server_token)
+    await message.answer("Введи API токен сервера:")
+
+@admin_router.message(ServerStates.waiting_server_token)
+async def server_token(message: Message, state: FSMContext):
+    await state.update_data(server_token=message.text.strip())
+    await state.set_state(ServerStates.waiting_server_inbound)
+    await message.answer("Введи ID inbound (обычно 4):")
+
+@admin_router.message(ServerStates.waiting_server_inbound)
+async def server_inbound(message: Message, state: FSMContext):
+    await state.update_data(server_inbound=message.text.strip())
+    await state.set_state(ServerStates.waiting_server_sub_url)
+    await message.answer("Введи URL подписки (например: https://russ.official-happ.ru:2096/sub):")
+
+@admin_router.message(ServerStates.waiting_server_sub_url)
+async def server_sub_url(message: Message, state: FSMContext):
+    data = await state.get_data()
+    await state.clear()
+    async with AsyncSessionLocal() as db:
+        db.add(Server(
+            name=data["server_name"],
+            url=data["server_url"],
+            token=data["server_token"],
+            inbound_id=int(data["server_inbound"]),
+            sub_url=message.text.strip(),
+            is_active=True
+        ))
+        await db.commit()
+    await message.answer(f"✅ Сервер *{data['server_name']}* добавлен!", parse_mode="Markdown")
+
+@admin_router.callback_query(F.data == "admin_server_del")
+async def admin_server_del(call: CallbackQuery, state: FSMContext):
+    if not is_admin(call.from_user.id):
+        return
+    await state.set_state(ServerStates.waiting_delete_server_id)
+    await call.message.answer("Введи ID сервера для удаления:")
+    await call.answer()
+
+@admin_router.message(ServerStates.waiting_delete_server_id)
+async def server_delete(message: Message, state: FSMContext):
+    await state.clear()
+    try:
+        server_id = int(message.text.strip())
+    except:
+        await message.answer("Неверный ID.")
+        return
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Server).where(Server.id == server_id))
+        server = result.scalar_one_or_none()
+        if not server:
+            await message.answer("Сервер не найден.")
+            return
+        server.is_active = False
+        await db.commit()
+    await message.answer(f"✅ Сервер ID:{server_id} деактивирован.")

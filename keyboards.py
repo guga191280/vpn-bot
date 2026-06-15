@@ -38,5 +38,6 @@ def admin_keyboard():
          InlineKeyboardButton(text="🚫 Заблокировать", callback_data="admin_block")],
         [InlineKeyboardButton(text="✅ Разблокировать", callback_data="admin_unblock"),
          InlineKeyboardButton(text="🔧 Тарифы", callback_data="admin_tariffs")],
-        [InlineKeyboardButton(text="📢 Рассылка", callback_data="admin_broadcast")],
+        [InlineKeyboardButton(text="🖥 Серверы", callback_data="admin_servers"),
+         InlineKeyboardButton(text="📢 Рассылка", callback_data="admin_broadcast")],
     ])

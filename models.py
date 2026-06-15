@@ -46,3 +46,14 @@ class Tariff(Base):
     days = Column(Integer)
     traffic_gb = Column(Float, default=0)
     is_active = Column(Boolean, default=True)
+
+class Server(Base):
+    __tablename__ = "servers"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100))
+    url = Column(String(200))
+    token = Column(String(200))
+    inbound_id = Column(Integer, default=4)
+    sub_url = Column(String(200))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
