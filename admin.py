@@ -86,18 +86,16 @@ async def admin_broadcast_start(call: CallbackQuery):
     await call.message.answer("Напиши сообщение для рассылки:")
     await call.answer()
 
-@admin_router.message(F.text)
+@admin_router.message(Command("broadcast"))
 async def admin_broadcast_send(message: Message, bot: Bot):
     if not is_admin(message.from_user.id):
         return
     if not broadcast_state.get(message.from_user.id):
         return
     broadcast_state.pop(message.from_user.id)
-
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User))
         users = result.scalars().all()
-
     sent, failed = 0, 0
     for user in users:
         try:
@@ -105,5 +103,4 @@ async def admin_broadcast_send(message: Message, bot: Bot):
             sent += 1
         except:
             failed += 1
-
     await message.answer(f"📢 Отправлено: {sent}, ошибок: {failed}")
