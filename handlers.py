@@ -28,6 +28,14 @@ INSTRUCTIONS = """
 ❓ Проблемы? Пиши в поддержку: @digitalTech78
 """
 
+def progress_bar(used: float, total: float, length: int = 10) -> str:
+    if total == 0:
+        return "∞"
+    pct = min(used / total, 1.0)
+    filled = int(pct * length)
+    bar = "█" * filled + "░" * (length - filled)
+    return f"{bar} {pct*100:.0f}%"
+
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     async with AsyncSessionLocal() as db:
@@ -40,14 +48,17 @@ async def cmd_start(message: Message):
                 full_name=message.from_user.full_name
             ))
             await db.commit()
-    await message.answer("👋 Привет! Выбери действие:", reply_markup=main_menu())
+    await message.answer(
+        "👋 Привет! Добро пожаловать в VPN сервис.\n\nВыбери действие:",
+        reply_markup=main_menu()
+    )
 
 @router.message(F.text == "🛒 Купить VPN")
 async def buy_vpn(message: Message):
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Tariff).where(Tariff.is_active == True))
         tariffs = result.scalars().all()
-    await message.answer("Выбери тариф:", reply_markup=tariffs_keyboard(tariffs))
+    await message.answer("💎 Выбери тариф:", reply_markup=tariffs_keyboard(tariffs))
 
 @router.callback_query(F.data.startswith("buy_"))
 async def process_buy(call: CallbackQuery):
@@ -87,7 +98,8 @@ async def process_buy(call: CallbackQuery):
         await db.commit()
 
     await call.message.answer(
-        f"💳 Оплата тарифа *{tariff.name}* — *{int(tariff.price)} руб.*\n\nПосле оплаты нажми «Я оплатил».",
+        f"💳 *{tariff.name}* — *{int(tariff.price)} руб.*\n\n"
+        f"После оплаты нажми «Я оплатил» и подписка активируется автоматически.",
         reply_markup=payment_keyboard(url, label),
         parse_mode="Markdown"
     )
@@ -99,7 +111,7 @@ async def check_pay(call: CallbackQuery):
     await call.answer("Проверяю...")
     paid = await check_payment(label)
     if not paid:
-        await call.message.answer("❌ Оплата не найдена. Попробуй через минуту.")
+        await call.message.answer("❌ Оплата не найдена. Подожди минуту и попробуй снова.")
         return
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Payment).where(Payment.label == label))
@@ -113,7 +125,11 @@ async def check_pay(call: CallbackQuery):
         tariff = result2.scalar_one_or_none()
         await activate_subscription(payment.user_id, tariff, db)
         await db.commit()
-    await call.message.answer("✅ Оплата прошла! Подписка активирована.\n\nИди в «Мои подписки» чтобы получить ключ.")
+    await call.message.answer(
+        "✅ *Оплата прошла!* Подписка активирована.\n\n"
+        "Иди в «Мои подписки» чтобы получить ключ.",
+        parse_mode="Markdown"
+    )
     await call.message.answer(INSTRUCTIONS, parse_mode="Markdown")
 
 async def activate_subscription(user_id: int, tariff, db):
@@ -148,13 +164,26 @@ async def my_subscriptions(message: Message):
         )
         sub = result.scalar_one_or_none()
     if not sub:
-        await message.answer("У тебя нет активных подписок. Нажми «Купить VPN».")
+        await message.answer(
+            "❌ У тебя нет активных подписок.\n\nНажми «Купить VPN» чтобы начать."
+        )
         return
-    status = "✅ Активна" if sub.expires_at > datetime.utcnow() else "❌ Истекла"
+    now = datetime.utcnow()
+    days_left = (sub.expires_at - now).days
+    status = "✅ Активна" if sub.expires_at > now else "❌ Истекла"
+
+    if sub.traffic_limit_gb > 0:
+        traffic_bar = progress_bar(0, sub.traffic_limit_gb)
+        traffic_text = f"Трафик: {traffic_bar}\n"
+    else:
+        traffic_text = "Трафик: ∞ безлимит\n"
+
     text = (
         f"📋 *Твоя подписка*\n\n"
         f"Статус: {status}\n"
-        f"Истекает: {sub.expires_at.strftime('%d.%m.%Y')}\n\n"
+        f"Истекает: {sub.expires_at.strftime('%d.%m.%Y')}\n"
+        f"Осталось: *{days_left} дн.*\n"
+        f"{traffic_text}\n"
         f"🔑 *Ключ подписки:*\n`{sub.vpn_key}`"
     )
     await message.answer(text, reply_markup=subscription_keyboard(sub.id), parse_mode="Markdown")
@@ -166,14 +195,6 @@ async def renew_sub(call: CallbackQuery):
         tariffs = result.scalars().all()
     await call.message.answer("Выбери тариф для продления:", reply_markup=tariffs_keyboard(tariffs))
     await call.answer()
-
-@router.message(F.text == "📖 Инструкция")
-async def instructions(message: Message):
-    await message.answer(INSTRUCTIONS, parse_mode="Markdown")
-
-@router.message(F.text == "🆘 Поддержка")
-async def support(message: Message):
-    await message.answer("Напиши нам: @digitalTech78")
 
 @router.message(F.text == "🆓 Тест")
 async def test_sub(message: Message):
@@ -192,3 +213,16 @@ async def test_sub(message: Message):
         await db.commit()
     await message.answer("✅ Тестовая подписка на 30 дней / 500 MB активирована!\n\nИди в «Мои подписки».")
     await message.answer(INSTRUCTIONS, parse_mode="Markdown")
+
+@router.message(F.text == "📖 Инструкция")
+async def instructions(message: Message):
+    await message.answer(INSTRUCTIONS, parse_mode="Markdown")
+
+@router.message(F.text == "🆘 Поддержка")
+async def support(message: Message):
+    await message.answer(
+        "🆘 *Поддержка*\n\n"
+        "Напиши нам: @digitalTech78\n\n"
+        "Время ответа: обычно в течение часа.",
+        parse_mode="Markdown"
+    )
