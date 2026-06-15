@@ -174,3 +174,21 @@ async def instructions(message: Message):
 @router.message(F.text == "🆘 Поддержка")
 async def support(message: Message):
     await message.answer("Напиши нам: @digitalTech78")
+
+@router.message(F.text == "🆓 Тест")
+async def test_sub(message: Message):
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Subscription).where(
+            Subscription.user_id == message.from_user.id,
+            Subscription.plan == "test"
+        ))
+        existing = result.scalar_one_or_none()
+        if existing:
+            await message.answer("❌ Тестовая подписка уже была использована.")
+            return
+        result2 = await db.execute(select(Tariff).where(Tariff.slug == "test"))
+        tariff = result2.scalar_one_or_none()
+        await activate_subscription(message.from_user.id, tariff, db)
+        await db.commit()
+    await message.answer("✅ Тестовая подписка на 30 дней / 500 MB активирована!\n\nИди в «Мои подписки».")
+    await message.answer(INSTRUCTIONS, parse_mode="Markdown")
