@@ -16,9 +16,21 @@ async def health(request):
     return web.Response(text="ok")
 
 async def on_startup(bot: Bot):
-    await init_db()
-    await bot.set_webhook(WEBHOOK_URL)
-    setup_scheduler(bot)
+    try:
+        await init_db()
+        logging.info("DB init OK")
+    except Exception as e:
+        logging.error(f"DB init error: {e}")
+    try:
+        await bot.set_webhook(WEBHOOK_URL)
+        logging.info("Webhook set OK")
+    except Exception as e:
+        logging.error(f"Webhook error: {e}")
+    try:
+        setup_scheduler(bot)
+        logging.info("Scheduler OK")
+    except Exception as e:
+        logging.error(f"Scheduler error: {e}")
 
 async def on_shutdown(bot: Bot):
     await bot.delete_webhook()
