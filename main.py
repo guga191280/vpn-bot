@@ -2,6 +2,7 @@ import asyncio
 import logging
 from aiohttp import web
 from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_PATH, PORT
@@ -37,7 +38,8 @@ async def on_shutdown(bot: Bot):
 
 def main():
     bot = Bot(token=BOT_TOKEN)
-    dp = Dispatcher()
+    storage = MemoryStorage()
+    dp = Dispatcher(storage=storage)
     dp.include_router(admin_router)
     dp.include_router(router)
     dp.startup.register(on_startup)
