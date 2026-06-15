@@ -2,9 +2,9 @@ import aiohttp
 import uuid
 import json
 import time
-from config import XUI_URL, XUI_USERNAME, XUI_PASSWORD
+from config import XUI_URL
 
-XUI_INBOUND_ID = 1
+XUI_INBOUND_ID = 4
 XUI_TOKEN = "Rz0rxMg2O02xSJjs5yLtuWeawLvzvPc8srB7QOT4ui5SYm6b"
 
 class XUIClient:
@@ -15,7 +15,7 @@ class XUIClient:
     async def get_session(self):
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession(
-                headers={"Xui-Token": XUI_TOKEN}
+                headers={"Authorization": f"Bearer {XUI_TOKEN}"}
             )
         return self._session
 
