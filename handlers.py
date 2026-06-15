@@ -8,7 +8,7 @@ from database import AsyncSessionLocal
 from models import User, Subscription, Payment, Tariff
 from keyboards import main_menu, tariffs_keyboard, payment_keyboard, subscription_keyboard
 from payment import create_payment_label, get_payment_url, check_payment
-from xui_client import xui
+from server_manager import get_best_server, create_client_on_server
 from config import ADMIN_IDS
 
 router = Router()
@@ -48,10 +48,7 @@ async def cmd_start(message: Message):
                 full_name=message.from_user.full_name
             ))
             await db.commit()
-    await message.answer(
-        "👋 Привет! Добро пожаловать в VPN сервис.\n\nВыбери действие:",
-        reply_markup=main_menu()
-    )
+    await message.answer("👋 Привет! Добро пожаловать в VPN сервис.\n\nВыбери действие:", reply_markup=main_menu())
 
 @router.message(F.text == "🛒 Купить VPN")
 async def buy_vpn(message: Message):
@@ -98,8 +95,7 @@ async def process_buy(call: CallbackQuery):
         await db.commit()
 
     await call.message.answer(
-        f"💳 *{tariff.name}* — *{int(tariff.price)} руб.*\n\n"
-        f"После оплаты нажми «Я оплатил» и подписка активируется автоматически.",
+        f"💳 *{tariff.name}* — *{int(tariff.price)} руб.*\n\nПосле оплаты нажми «Я оплатил».",
         reply_markup=payment_keyboard(url, label),
         parse_mode="Markdown"
     )
@@ -125,26 +121,33 @@ async def check_pay(call: CallbackQuery):
         tariff = result2.scalar_one_or_none()
         await activate_subscription(payment.user_id, tariff, db)
         await db.commit()
-    await call.message.answer(
-        "✅ *Оплата прошла!* Подписка активирована.\n\n"
-        "Иди в «Мои подписки» чтобы получить ключ.",
-        parse_mode="Markdown"
-    )
+    await call.message.answer("✅ *Оплата прошла!* Подписка активирована.\n\nИди в «Мои подписки».", parse_mode="Markdown")
     await call.message.answer(INSTRUCTIONS, parse_mode="Markdown")
 
 async def activate_subscription(user_id: int, tariff, db):
-    await xui.login()
-    client = await xui.create_client(tariff.days, tariff.traffic_gb)
-    vpn_key = await xui.get_client_url(client["client_id"])
+    server = await get_best_server()
+    if not server:
+        # fallback на старый xui если нет серверов в БД
+        from xui_client import xui
+        await xui.login()
+        client = await xui.create_client(tariff.days, tariff.traffic_gb)
+        vpn_key = await xui.get_client_url(client["client_id"])
+        client_id = client["client_id"]
+    else:
+        client = await create_client_on_server(server, tariff.days, tariff.traffic_gb)
+        vpn_key = client["vpn_key"]
+        client_id = client["client_id"]
+
     result = await db.execute(
         select(Subscription).where(Subscription.user_id == user_id, Subscription.is_active == True)
     )
     old_sub = result.scalar_one_or_none()
     if old_sub:
         old_sub.is_active = False
+
     sub = Subscription(
         user_id=user_id,
-        xui_client_id=client["client_id"],
+        xui_client_id=client_id,
         vpn_key=vpn_key,
         plan=tariff.slug,
         traffic_limit_gb=tariff.traffic_gb,
@@ -164,20 +167,12 @@ async def my_subscriptions(message: Message):
         )
         sub = result.scalar_one_or_none()
     if not sub:
-        await message.answer(
-            "❌ У тебя нет активных подписок.\n\nНажми «Купить VPN» чтобы начать."
-        )
+        await message.answer("❌ У тебя нет активных подписок.\n\nНажми «Купить VPN» чтобы начать.")
         return
     now = datetime.utcnow()
     days_left = (sub.expires_at - now).days
     status = "✅ Активна" if sub.expires_at > now else "❌ Истекла"
-
-    if sub.traffic_limit_gb > 0:
-        traffic_bar = progress_bar(0, sub.traffic_limit_gb)
-        traffic_text = f"Трафик: {traffic_bar}\n"
-    else:
-        traffic_text = "Трафик: ∞ безлимит\n"
-
+    traffic_text = f"Трафик: {progress_bar(0, sub.traffic_limit_gb)}\n" if sub.traffic_limit_gb > 0 else "Трафик: ∞ безлимит\n"
     text = (
         f"📋 *Твоя подписка*\n\n"
         f"Статус: {status}\n"
@@ -221,8 +216,6 @@ async def instructions(message: Message):
 @router.message(F.text == "🆘 Поддержка")
 async def support(message: Message):
     await message.answer(
-        "🆘 *Поддержка*\n\n"
-        "Напиши нам: @digitalTech78\n\n"
-        "Время ответа: обычно в течение часа.",
+        "🆘 *Поддержка*\n\nНапиши нам: @digitalTech78\n\nВремя ответа: обычно в течение часа.",
         parse_mode="Markdown"
     )
