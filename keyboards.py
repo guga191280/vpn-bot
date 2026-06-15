@@ -28,10 +28,15 @@ def subscription_keyboard(sub_id: int):
 
 def admin_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users")],
-        [InlineKeyboardButton(text="💰 Платежи", callback_data="admin_payments")],
-        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users"),
+         InlineKeyboardButton(text="📋 Подписки", callback_data="admin_active_subs")],
+        [InlineKeyboardButton(text="💰 Платежи", callback_data="admin_payments"),
+         InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="🔍 Поиск юзера", callback_data="admin_search"),
+         InlineKeyboardButton(text="🎁 Выдать подписку", callback_data="admin_grant")],
+        [InlineKeyboardButton(text="⏳ Продлить", callback_data="admin_extend"),
+         InlineKeyboardButton(text="🚫 Заблокировать", callback_data="admin_block")],
+        [InlineKeyboardButton(text="✅ Разблокировать", callback_data="admin_unblock"),
+         InlineKeyboardButton(text="🔧 Тарифы", callback_data="admin_tariffs")],
         [InlineKeyboardButton(text="📢 Рассылка", callback_data="admin_broadcast")],
-        [InlineKeyboardButton(text="🔧 Тарифы", callback_data="admin_tariffs")],
-        [InlineKeyboardButton(text="🚫 Блокировка", callback_data="admin_block")],
     ])
