@@ -1,7 +1,6 @@
 import aiohttp
 import uuid
 import time
-import random
 import logging
 
 XUI_BASE_URL = "https://russ.official-happ.ru:12822/lpTK27EkL3HLJGkZgp"
@@ -33,8 +32,7 @@ class XUIClient:
                 ssl=False
             )
             data = await resp.json()
-            ids = [i["id"] for i in data.get("obj", []) if i.get("protocol") == "vless"]
-            return ids
+            return [i["id"] for i in data.get("obj", []) if i.get("enable", True)]
         except Exception as e:
             logging.error(f"get_inbound_ids error: {e}")
             return [11]
@@ -45,7 +43,6 @@ class XUIClient:
         total_bytes = int(traffic_gb * 1024 ** 3) if traffic_gb > 0 else 0
 
         inbound_ids = await self.get_inbound_ids()
-        chosen_id = random.choice(inbound_ids)
 
         payload = {
             "client": {
@@ -56,7 +53,7 @@ class XUIClient:
                 "limitIp": 3,
                 "enable": True
             },
-            "inboundIds": [chosen_id]
+            "inboundIds": inbound_ids
         }
 
         session = await self.get_session()
