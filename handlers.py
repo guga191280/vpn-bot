@@ -8,7 +8,7 @@ from database import AsyncSessionLocal
 from models import User, Subscription, Payment, Tariff
 from keyboards import main_menu, tariffs_keyboard, payment_keyboard, subscription_keyboard
 from payment import create_payment_label, get_payment_url, check_payment
-from server_manager import get_best_server, create_client_on_server
+from xui_client import xui
 from config import ADMIN_IDS
 
 router = Router()
@@ -125,14 +125,10 @@ async def check_pay(call: CallbackQuery):
     await call.message.answer(INSTRUCTIONS, parse_mode="Markdown")
 
 async def activate_subscription(user_id: int, tariff, db):
-    server = await get_best_server()
-    if not server:
-        # fallback на старый xui если нет серверов в БД
-        from xui_client import xui
-        await xui.login()
-        client = await xui.create_client(tariff.days, tariff.traffic_gb)
-        vpn_key = await xui.get_client_url(client["client_id"])
-        client_id = client["client_id"]
+    await xui.login()
+    client = await xui.create_client(tariff.days, tariff.traffic_gb)
+    vpn_key = await xui.get_client_url(client["client_id"])
+    client_id = client["client_id"]
     else:
         client = await create_client_on_server(server, tariff.days, tariff.traffic_gb)
         vpn_key = client["vpn_key"]
