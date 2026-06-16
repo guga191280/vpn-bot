@@ -123,7 +123,7 @@ async def check_pay(call: CallbackQuery):
 
 async def activate_subscription(user_id: int, tariff, db):
     await xui.login()
-    client = await xui.create_client(tariff.days, tariff.traffic_gb)
+    client = await xui.create_client(tariff.days, tariff.traffic_gb, user_id)
     vpn_key = await xui.get_client_url(client["client_id"])
     result = await db.execute(
         select(Subscription).where(Subscription.user_id == user_id, Subscription.is_active == True)

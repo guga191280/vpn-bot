@@ -30,19 +30,18 @@ class XUIClient:
             logging.error(f"get_inbound_ids: {e}")
             return [11]
 
-    async def create_client(self, days: int, traffic_gb: float = 0) -> dict:
-        email = f"vpn{uuid.uuid4().hex[:8]}"
+    async def create_client(self, days: int, traffic_gb: float = 0, user_id: int = 0) -> dict:
+        email = f"tg{user_id}_{uuid.uuid4().hex[:6]}"
         expire_ms = int(time.time() * 1000) + days * 86400 * 1000
         total_bytes = int(traffic_gb * 1024 ** 3) if traffic_gb > 0 else 0
 
         inbound_ids = await self.get_inbound_ids()
 
         async with aiohttp.ClientSession(headers=self._headers()) as s:
-            # создаём в первом inbound
             try:
                 resp = await s.post(
                     f"{self.base_url}/panel/api/clients/add",
-                    json={"client": {"email": email, "totalGB": total_bytes, "expiryTime": expire_ms, "tgId": 0, "limitIp": 3, "enable": True}, "inboundIds": [inbound_ids[0]]},
+                    json={"client": {"email": email, "totalGB": total_bytes, "expiryTime": expire_ms, "tgId": user_id, "limitIp": 3, "enable": True}, "inboundIds": [inbound_ids[0]]},
                     ssl=False
                 )
                 await resp.json()
@@ -50,10 +49,8 @@ class XUIClient:
                 logging.error(f"create: {e}")
                 return {"client_id": email, "sub_id": email}
 
-            # ждём 2 секунды
             await asyncio.sleep(2)
 
-            # attach ко всем остальным
             if len(inbound_ids) > 1:
                 try:
                     resp2 = await s.post(
@@ -65,10 +62,8 @@ class XUIClient:
                 except Exception as e:
                     logging.error(f"attach: {e}")
 
-            # ждём ещё 1 секунду
             await asyncio.sleep(1)
 
-            # получаем subId
             try:
                 resp3 = await s.get(f"{self.base_url}/panel/api/clients/get/{email}", ssl=False)
                 data3 = await resp3.json()
