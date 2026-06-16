@@ -14,6 +14,7 @@ def setup_scheduler(bot: Bot):
     scheduler.add_job(check_expiring, "interval", hours=12, args=[bot])
     scheduler.add_job(deactivate_expired, "interval", hours=6)
     scheduler.add_job(cleanup_old_data, "interval", hours=24)
+    scheduler.add_job(daily_restart, "cron", hour=3, minute=0)
     scheduler.add_job(auto_renew, "interval", hours=12, args=[bot])
     scheduler.start()
 
@@ -79,3 +80,7 @@ async def auto_renew(bot: Bot):
                 )
             except:
                 pass
+
+async def daily_restart():
+    import os, signal
+    os.kill(os.getpid(), signal.SIGTERM)
