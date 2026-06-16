@@ -1,31 +1,51 @@
 import aiohttp
 import uuid
 import time
-from config import XUI_URL
+import random
+import logging
 
-XUI_INBOUND_ID = 4
+XUI_BASE_URL = "https://russ.official-happ.ru:12822/lpTK27EkL3HLJGkZgp"
 XUI_TOKEN = "Rz0rxMg2O02xSJjs5yLtuWeawLvzvPc8srB7QOT4ui5SYm6b"
 XUI_SUB_URL = "https://russ.official-happ.ru:2096/sub"
 
 class XUIClient:
     def __init__(self):
-        self.base_url = XUI_URL
+        self.base_url = XUI_BASE_URL
+        self.token = XUI_TOKEN
+        self.sub_url = XUI_SUB_URL
         self._session = None
 
     async def get_session(self):
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession(
-                headers={"Authorization": f"Bearer {XUI_TOKEN}"}
+                headers={"Authorization": f"Bearer {self.token}"}
             )
         return self._session
 
     async def login(self):
         return True
 
+    async def get_inbound_ids(self) -> list:
+        session = await self.get_session()
+        try:
+            resp = await session.get(
+                f"{self.base_url}/panel/api/inbounds/list",
+                ssl=False
+            )
+            data = await resp.json()
+            ids = [i["id"] for i in data.get("obj", []) if i.get("protocol") == "vless"]
+            return ids
+        except Exception as e:
+            logging.error(f"get_inbound_ids error: {e}")
+            return [11]
+
     async def create_client(self, days: int, traffic_gb: float = 0) -> dict:
         email = f"vpn{uuid.uuid4().hex[:8]}"
         expire_ms = int(time.time() * 1000) + days * 86400 * 1000
         total_bytes = int(traffic_gb * 1024 ** 3) if traffic_gb > 0 else 0
+
+        inbound_ids = await self.get_inbound_ids()
+        chosen_id = random.choice(inbound_ids)
 
         payload = {
             "client": {
@@ -36,7 +56,7 @@ class XUIClient:
                 "limitIp": 3,
                 "enable": True
             },
-            "inboundIds": [XUI_INBOUND_ID]
+            "inboundIds": [chosen_id]
         }
 
         session = await self.get_session()
@@ -56,7 +76,7 @@ class XUIClient:
                 sub_id = data2.get("obj", {}).get("client", {}).get("subId", email)
                 return {"client_id": email, "sub_id": sub_id}
         except Exception as e:
-            pass
+            logging.error(f"create_client error: {e}")
         return {"client_id": email, "sub_id": email}
 
     async def get_client_url(self, client_id: str) -> str:
@@ -68,10 +88,10 @@ class XUIClient:
             )
             data = await resp.json()
             sub_id = data.get("obj", {}).get("client", {}).get("subId", client_id)
-            return f"{XUI_SUB_URL}/{sub_id}"
+            return f"{self.sub_url}/{sub_id}"
         except:
             pass
-        return f"{XUI_SUB_URL}/{client_id}"
+        return f"{self.sub_url}/{client_id}"
 
     async def disable_client(self, client_id: str):
         session = await self.get_session()
