@@ -374,7 +374,6 @@ async def edit_tariff_price(message: Message, state: FSMContext):
             await message.answer(f"✅ Цена тарифа *{tariff.name}* изменена на *{int(price)} руб.*", parse_mode="Markdown")
 
 from models import Server
-from server_manager import get_best_server as get_active_servers
 
 class ServerStates(StatesGroup):
     waiting_server_name = State()
