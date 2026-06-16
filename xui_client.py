@@ -40,9 +40,6 @@ class XUIClient:
         total_bytes = int(traffic_gb * 1024 ** 3) if traffic_gb > 0 else 0
 
         inbound_ids = await self.get_inbound_ids()
-        if not inbound_ids:
-            inbound_ids = [11]
-
         session = await self.get_session()
 
         # создаём в первом inbound
@@ -64,12 +61,12 @@ class XUIClient:
                 ssl=False
             )
             data = await resp.json()
-            if not data.get("success"):
-                logging.error(f"create_client error: {data}")
+            logging.info(f"create_client: {data}")
         except Exception as e:
             logging.error(f"create_client error: {e}")
+            return {"client_id": email, "sub_id": email}
 
-        # attach ко всем остальным
+        # attach ко всем остальным сразу
         remaining = inbound_ids[1:]
         if remaining:
             try:
@@ -79,7 +76,7 @@ class XUIClient:
                     ssl=False
                 )
                 data2 = await resp2.json()
-                logging.info(f"attach result: {data2}")
+                logging.info(f"attach: {data2}")
             except Exception as e:
                 logging.error(f"attach error: {e}")
 
@@ -91,6 +88,7 @@ class XUIClient:
             )
             data3 = await resp3.json()
             sub_id = data3.get("obj", {}).get("client", {}).get("subId", email)
+            logging.info(f"subId: {sub_id}, inbounds: {len(inbound_ids)}")
             return {"client_id": email, "sub_id": sub_id}
         except Exception as e:
             logging.error(f"get subId error: {e}")
