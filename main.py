@@ -11,6 +11,7 @@ from admin import admin_router
 from scheduler import setup_scheduler
 
 logging.basicConfig(level=logging.ERROR)
+logging.getLogger("xui_client").setLevel(logging.CRITICAL)
 logging.getLogger("apscheduler").setLevel(logging.ERROR)
 logging.getLogger("aiogram").setLevel(logging.ERROR)
 logging.getLogger("aiohttp").setLevel(logging.ERROR)
