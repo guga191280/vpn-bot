@@ -66,7 +66,6 @@ async def process_buy(call: CallbackQuery):
         if not tariff:
             await call.answer("Тариф не найден")
             return
-
         if tariff.price == 0:
             existing = await db.execute(select(Subscription).where(
                 Subscription.user_id == call.from_user.id,
@@ -82,7 +81,6 @@ async def process_buy(call: CallbackQuery):
             await call.message.answer(INSTRUCTIONS, parse_mode="Markdown")
             await call.answer()
             return
-
         label = await create_payment_label(call.from_user.id, slug)
         url = get_payment_url(tariff.price, label, f"VPN {tariff.name}")
         db.add(Payment(
@@ -93,7 +91,6 @@ async def process_buy(call: CallbackQuery):
             status="pending"
         ))
         await db.commit()
-
     await call.message.answer(
         f"💳 *{tariff.name}* — *{int(tariff.price)} руб.*\n\nПосле оплаты нажми «Я оплатил».",
         reply_markup=payment_keyboard(url, label),
@@ -128,22 +125,15 @@ async def activate_subscription(user_id: int, tariff, db):
     await xui.login()
     client = await xui.create_client(tariff.days, tariff.traffic_gb)
     vpn_key = await xui.get_client_url(client["client_id"])
-    client_id = client["client_id"]
-    else:
-        client = await create_client_on_server(server, tariff.days, tariff.traffic_gb)
-        vpn_key = client["vpn_key"]
-        client_id = client["client_id"]
-
     result = await db.execute(
         select(Subscription).where(Subscription.user_id == user_id, Subscription.is_active == True)
     )
     old_sub = result.scalar_one_or_none()
     if old_sub:
         old_sub.is_active = False
-
     sub = Subscription(
         user_id=user_id,
-        xui_client_id=client_id,
+        xui_client_id=client["client_id"],
         vpn_key=vpn_key,
         plan=tariff.slug,
         traffic_limit_gb=tariff.traffic_gb,
