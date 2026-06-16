@@ -128,7 +128,7 @@ async def activate_subscription(user_id: int, tariff, db):
     result = await db.execute(
         select(Subscription).where(Subscription.user_id == user_id, Subscription.is_active == True)
     )
-    old_sub = result.scalar_one_or_none()
+    old_sub = result.scalars().first()
     if old_sub:
         old_sub.is_active = False
     sub = Subscription(
@@ -151,7 +151,7 @@ async def my_subscriptions(message: Message):
                 Subscription.is_active == True
             )
         )
-        sub = result.scalar_one_or_none()
+        sub = result.scalars().first()
     if not sub:
         await message.answer("❌ У тебя нет активных подписок.\n\nНажми «Купить VPN» чтобы начать.")
         return
