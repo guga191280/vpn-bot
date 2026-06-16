@@ -27,10 +27,7 @@ class XUIClient:
     async def get_inbound_ids(self) -> list:
         session = await self.get_session()
         try:
-            resp = await session.get(
-                f"{self.base_url}/panel/api/inbounds/list",
-                ssl=False
-            )
+            resp = await session.get(f"{self.base_url}/panel/api/inbounds/list", ssl=False)
             data = await resp.json()
             return [i["id"] for i in data.get("obj", []) if i.get("enable", True)]
         except Exception as e:
@@ -43,37 +40,45 @@ class XUIClient:
         total_bytes = int(traffic_gb * 1024 ** 3) if traffic_gb > 0 else 0
 
         inbound_ids = await self.get_inbound_ids()
-
-        payload = {
-            "client": {
-                "email": email,
-                "totalGB": total_bytes,
-                "expiryTime": expire_ms,
-                "tgId": 0,
-                "limitIp": 3,
-                "enable": True
-            },
-            "inboundIds": inbound_ids
-        }
-
         session = await self.get_session()
-        try:
-            resp = await session.post(
-                f"{self.base_url}/panel/api/clients/add",
-                json=payload,
-                ssl=False
-            )
-            data = await resp.json()
-            if data.get("success"):
-                resp2 = await session.get(
-                    f"{self.base_url}/panel/api/clients/get/{email}",
+
+        success_count = 0
+        for inbound_id in inbound_ids:
+            payload = {
+                "client": {
+                    "email": email,
+                    "totalGB": total_bytes,
+                    "expiryTime": expire_ms,
+                    "tgId": 0,
+                    "limitIp": 3,
+                    "enable": True
+                },
+                "inboundIds": [inbound_id]
+            }
+            try:
+                resp = await session.post(
+                    f"{self.base_url}/panel/api/clients/add",
+                    json=payload,
                     ssl=False
                 )
-                data2 = await resp2.json()
-                sub_id = data2.get("obj", {}).get("client", {}).get("subId", email)
-                return {"client_id": email, "sub_id": sub_id}
+                data = await resp.json()
+                if data.get("success"):
+                    success_count += 1
+            except Exception as e:
+                logging.error(f"create_client inbound {inbound_id} error: {e}")
+
+        # получаем subId
+        try:
+            resp2 = await session.get(
+                f"{self.base_url}/panel/api/clients/get/{email}",
+                ssl=False
+            )
+            data2 = await resp2.json()
+            sub_id = data2.get("obj", {}).get("client", {}).get("subId", email)
+            logging.info(f"Created client {email} in {success_count}/{len(inbound_ids)} inbounds")
+            return {"client_id": email, "sub_id": sub_id}
         except Exception as e:
-            logging.error(f"create_client error: {e}")
+            logging.error(f"get subId error: {e}")
         return {"client_id": email, "sub_id": email}
 
     async def get_client_url(self, client_id: str) -> str:
@@ -91,25 +96,29 @@ class XUIClient:
         return f"{self.sub_url}/{client_id}"
 
     async def disable_client(self, client_id: str):
+        inbound_ids = await self.get_inbound_ids()
         session = await self.get_session()
-        try:
-            await session.post(
-                f"{self.base_url}/panel/api/clients/update/{client_id}",
-                json={"enable": False},
-                ssl=False
-            )
-        except:
-            pass
+        for inbound_id in inbound_ids:
+            try:
+                await session.post(
+                    f"{self.base_url}/panel/api/clients/update/{client_id}",
+                    json={"enable": False},
+                    ssl=False
+                )
+            except:
+                pass
 
     async def enable_client(self, client_id: str):
+        inbound_ids = await self.get_inbound_ids()
         session = await self.get_session()
-        try:
-            await session.post(
-                f"{self.base_url}/panel/api/clients/update/{client_id}",
-                json={"enable": True},
-                ssl=False
-            )
-        except:
-            pass
+        for inbound_id in inbound_ids:
+            try:
+                await session.post(
+                    f"{self.base_url}/panel/api/clients/update/{client_id}",
+                    json={"enable": True},
+                    ssl=False
+                )
+            except:
+                pass
 
 xui = XUIClient()
